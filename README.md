@@ -129,3 +129,7 @@ http://localhost:3002
 ```
 
 The bot should remain a thin hosted adapter. Product rules should stay in the Discasa app whenever they can run there.
+
+## License
+
+This repository is licensed under the MIT License. See [LICENSE](LICENSE).

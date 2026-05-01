@@ -182,3 +182,7 @@ Windows launchers:
 - Keep image assets under `img` and image helper scripts under `img/scripts`.
 - Keep logs and errors standardized.
 - Validate with `npm run check` before pushing.
+
+## 12. License
+
+Discasa Bot is distributed under the MIT License. See `LICENSE` for the full text.
