@@ -10,6 +10,8 @@ The bot is not the owner of Discasa product rules. The desktop app remains respo
 
 ## 2. Components
 
+Image assets live under `img`, with any image-related helper scripts reserved for `img/scripts`.
+
 ```text
 src/index.ts
 ```
@@ -177,5 +179,6 @@ Windows launchers:
 - Keep product rules in the app.
 - Do not add UI concerns to the bot.
 - Do not make upload limits dynamic by Discord boost level.
+- Keep image assets under `img` and image helper scripts under `img/scripts`.
 - Keep logs and errors standardized.
 - Validate with `npm run check` before pushing.

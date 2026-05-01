@@ -26,8 +26,9 @@ The bot includes:
 
 ```text
 Discasa_bot
-  art
+  img
     bot       Bot source artwork
+    scripts   Image-related helper scripts, when present
     sources   External bot artwork references
 
   src
@@ -114,6 +115,10 @@ npm run build
 ```
 
 Both commands currently run TypeScript with `--noEmit`.
+
+## Asset Layout
+
+Image assets and source artwork live under `img`. Image-related helper scripts should live under `img/scripts`.
 
 ## Relationship to Discasa
 
