@@ -72,6 +72,13 @@ export type DiscasaExternalImportResult = {
   imported: LibraryItem[];
   discordDrive: DiscasaDriveImportResult;
   localMirror: DiscasaLocalMirrorImportResult;
+  watchedFolder: DiscasaWatchedFolderImportResult;
+};
+
+export type DiscasaWatchedFolderImportResult = {
+  imported: LibraryItem[];
+  scannedFileCount: number;
+  skippedFileCount: number;
 };
 
 export type AlbumRecord = {
@@ -146,6 +153,9 @@ export type LibraryItem = {
   storageManifest?: LibraryItemStorageManifest | null;
   originalSource?: LibraryItemOriginalSource | null;
   savedMediaEdit?: LibraryItemSavedMediaEdit | null;
+  contentHash?: string;
+  sourceCollection?: "watched";
+  sourceFingerprint?: string;
   contentUrl?: string;
   thumbnailUrl?: string;
   localMirrorAvailable?: boolean;
@@ -180,6 +190,8 @@ export type DiscasaConfig = {
   sidebarCollapsed: boolean;
   localMirrorEnabled: boolean;
   localMirrorPath: string | null;
+  watchedFolderEnabled: boolean;
+  watchedFolderPath: string | null;
   language: "en" | "pt";
 };
 
@@ -194,6 +206,8 @@ export const DISCASA_DEFAULT_CONFIG: DiscasaConfig = {
   sidebarCollapsed: false,
   localMirrorEnabled: false,
   localMirrorPath: null,
+  watchedFolderEnabled: false,
+  watchedFolderPath: null,
   language: "en",
 };
 
@@ -208,6 +222,9 @@ export type LocalStorageStatus = {
   thumbnailCachePath: string;
   thumbnailCacheFileCount: number;
   thumbnailCacheBytes: number;
+  watchedFolderEnabled: boolean;
+  watchedFolderPath: string | null;
+  watchedFolderPathExists: boolean;
 };
 
 export type PersistedIndexSnapshot = {

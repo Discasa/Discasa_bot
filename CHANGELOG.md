@@ -2,6 +2,13 @@
 
 All notable changes to **Discasa Bot** are documented in this file.
 
+## [2026-05-01-library-automation]
+
+### Changed
+
+- Extended shared snapshot/config contracts with app-owned watched-folder and content-hash metadata.
+- Documented that folder uploads, watched-folder imports, duplicate detection, and exclusive album moves remain desktop-app responsibilities.
+
 ## [2026-05-01-license]
 
 ### Added

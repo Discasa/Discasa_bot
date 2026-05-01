@@ -19,6 +19,7 @@ The bot includes:
 - raw attachment listing from `discasa-drive`;
 - targeted attachment reference resolution;
 - snapshot read/write endpoints for index, folders, and config;
+- compatibility fields for app-owned content hashes and watched-folder metadata in snapshots;
 - standardized logging and error responses;
 - mock mode for local development without Discord credentials.
 
@@ -129,6 +130,8 @@ http://localhost:3002
 ```
 
 The bot should remain a thin hosted adapter. Product rules should stay in the Discasa app whenever they can run there.
+
+Folder uploads, watched-folder imports, duplicate detection, and album move semantics are app-owned behaviors. The bot stores and returns the snapshot data needed by those flows, but it does not decide how collections are displayed or grouped.
 
 ## License
 

@@ -6,7 +6,7 @@ This document describes the standalone Discasa Bot service after extraction from
 
 Discasa Bot is a hosted Discord service for operations that require bot identity. It is intentionally compact so it can be deployed online with predictable memory, CPU, and operational behavior.
 
-The bot is not the owner of Discasa product rules. The desktop app remains responsible for library state, chunking decisions, recovery decisions, user preferences, local mirroring, and UI behavior.
+The bot is not the owner of Discasa product rules. The desktop app remains responsible for library state, chunking decisions, recovery decisions, user preferences, local mirroring, watched-folder imports, duplicate detection, album movement, and UI behavior.
 
 ## 2. Components
 
@@ -118,6 +118,8 @@ Discasa stores JSON snapshots in `discasa-index`:
 
 The bot can read the latest snapshot attachment and write replacement snapshots, but it does not decide snapshot contents.
 
+App-owned metadata such as content hashes, watched-folder source markers, and source fingerprints is preserved as part of the JSON contracts so the desktop app can rebuild collection state after hydration.
+
 ## 8. Diagnostics
 
 Diagnostics report:
@@ -178,6 +180,7 @@ Windows launchers:
 - Keep the bot small and predictable.
 - Keep product rules in the app.
 - Do not add UI concerns to the bot.
+- Preserve app-owned snapshot fields even when the bot does not interpret them.
 - Do not make upload limits dynamic by Discord boost level.
 - Keep image assets under `img` and image helper scripts under `img/scripts`.
 - Keep logs and errors standardized.
