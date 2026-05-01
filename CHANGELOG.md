@@ -2,6 +2,13 @@
 
 All notable changes to **Discasa Bot** are documented in this file.
 
+## [2026-05-01-docs-assets]
+
+### Changed
+
+- Renamed the repository image asset folder from `art` to `img`.
+- Updated documentation references to the standardized image folder.
+
 ## [2026-05-01]
 
 ### Changed
