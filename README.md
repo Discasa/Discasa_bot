@@ -4,6 +4,8 @@ Discasa Bot is the hosted Discord adapter for Discasa. It keeps the online servi
 
 For full operational notes, see [documentation.md](documentation.md).
 
+For project history, see [CHANGELOG.md](CHANGELOG.md).
+
 ## Current State
 
 The bot includes:
