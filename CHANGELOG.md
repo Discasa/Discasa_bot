@@ -2,6 +2,12 @@
 
 All notable changes to **Discasa Bot** are documented in this file.
 
+## [2026-05-02-developer-docs]
+
+### Changed
+
+- Expanded `documentation.md` into a developer onboarding guide with service boundaries, API details, snapshot compatibility, deployment notes, checklists, and troubleshooting.
+
 ## [2026-05-01-library-automation]
 
 ### Changed
