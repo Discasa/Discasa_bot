@@ -2,6 +2,14 @@
 
 All notable changes to **Discasa Bot** are documented in this file.
 
+## [2026-05-03-quieter-adapter-logs]
+
+### Changed
+
+- Kept health polling and successful attachment-resolution probes out of routine HTTP logs.
+- Attachment resolution now logs only misses as warnings instead of logging every recovery request.
+- Documented that current trash/restore behavior is app-owned logical snapshot state, not bot-owned Discord storage movement.
+
 ## [2026-05-03-action-logging]
 
 ### Added

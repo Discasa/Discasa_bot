@@ -20,7 +20,7 @@ The bot includes:
 - targeted attachment reference resolution;
 - snapshot read/write endpoints for index, folders, and config;
 - compatibility fields for app-owned content hashes and watched-folder metadata in snapshots;
-- standardized HTTP, setup, storage, snapshot, and error logging;
+- standardized setup, storage, snapshot, and error logging with noisy health and attachment-recovery probes kept quiet;
 - mock mode for local development without Discord credentials.
 
 ## Repository Layout
@@ -57,7 +57,7 @@ Discasa
 
 - `discasa-drive`: active file storage.
 - `discasa-index`: index, folder, config, and install snapshots.
-- `discasa-trash`: storage for items moved to trash.
+- `discasa-trash`: retained for compatibility with older app versions and existing trash-channel storage. Current trash/restore decisions are logical app state in snapshots.
 
 The bot also keeps compatibility with older Discasa installations where snapshot data may exist in legacy channels.
 
@@ -131,7 +131,7 @@ http://localhost:3002
 
 The bot should remain a thin hosted adapter. Product rules should stay in the Discasa app whenever they can run there.
 
-Folder uploads, watched-folder imports, duplicate detection, and album move semantics are app-owned behaviors. The bot stores and returns the snapshot data needed by those flows, but it does not decide how collections are displayed or grouped.
+Folder uploads, watched-folder imports, duplicate detection, album move semantics, and trash/restore semantics are app-owned behaviors. The bot stores and returns the snapshot data needed by those flows, but it does not decide how collections are displayed, grouped, trashed, or restored.
 
 ## License
 

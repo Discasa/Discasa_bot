@@ -30,12 +30,17 @@ import {
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
+const QUIET_HTTP_LOG_PATHS = new Set(["/health", "/files/resolve-attachment"]);
 
 app.use(express.json({ limit: "25mb" }));
 app.use((request, response, next) => {
   const startedAt = Date.now();
 
   response.on("finish", () => {
+    if (QUIET_HTTP_LOG_PATHS.has(request.path)) {
+      return;
+    }
+
     logger.info(`${request.method} ${request.originalUrl} ${response.statusCode} ${Date.now() - startedAt}ms`);
   });
 
@@ -170,9 +175,15 @@ app.post("/files/drive/attachments", async (request, response, next) => {
 app.post("/files/resolve-attachment", async (request, response, next) => {
   try {
     const reference = request.body.reference as { preferredFileName?: unknown } | undefined;
-    logger.info("Attachment resolution requested.", { preferredFileName: reference?.preferredFileName ?? null });
+    const resolution = await resolveAttachmentReference(request.body.reference);
+    if (!resolution) {
+      logger.warn("Attachment resolution did not find a matching Discord attachment.", {
+        preferredFileName: reference?.preferredFileName ?? null,
+      });
+    }
+
     response.json({
-      resolution: await resolveAttachmentReference(request.body.reference),
+      resolution,
     });
   } catch (error) {
     next(error);

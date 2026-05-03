@@ -102,6 +102,8 @@ The app owns:
 - duplicate detection;
 - local cache and thumbnail decisions;
 - optimistic UI and rollback;
+- trash and restore semantics;
+- decisions about when scans or recovery probes are necessary;
 - snapshot JSON contents.
 
 The bot owns:
@@ -139,7 +141,7 @@ Channel purpose:
 
 - `discasa-drive`: active file attachments and chunk parts.
 - `discasa-index`: index, folder, config, and installation snapshots.
-- `discasa-trash`: attachments moved to trash.
+- `discasa-trash`: compatibility channel for older app versions and any storage already there. Current trash/restore is app-owned logical snapshot state, not a bot-owned physical move.
 
 ## 7. HTTP API
 
@@ -255,14 +257,17 @@ Route handlers should pass errors through Express error handling. Avoid returnin
 
 Logs should be operationally useful:
 
-- every HTTP request with method, route, status, and elapsed time;
+- meaningful HTTP requests with method, route, status, and elapsed time;
 - startup mode and port;
 - Discord login state;
 - setup actions;
 - upload actions and failures;
-- drive attachment scans and attachment resolution requests;
+- drive attachment scans;
+- attachment resolution misses, rather than every successful recovery probe;
 - snapshot current/latest/sync actions and failures;
 - deletion actions and failures.
+
+Health polling and successful attachment-recovery probes are intentionally quiet so normal app activity does not look like product work.
 
 Do not log secret tokens or full OAuth credentials.
 
