@@ -20,7 +20,7 @@ The bot includes:
 - targeted attachment reference resolution;
 - snapshot read/write endpoints for index, folders, and config;
 - compatibility fields for app-owned content hashes and watched-folder metadata in snapshots;
-- standardized logging and error responses;
+- standardized HTTP, setup, storage, snapshot, and error logging;
 - mock mode for local development without Discord credentials.
 
 ## Repository Layout

@@ -32,6 +32,15 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(express.json({ limit: "25mb" }));
+app.use((request, response, next) => {
+  const startedAt = Date.now();
+
+  response.on("finish", () => {
+    logger.info(`${request.method} ${request.originalUrl} ${response.statusCode} ${Date.now() - startedAt}ms`);
+  });
+
+  next();
+});
 
 function readContext(raw: unknown): ActiveStorageContext {
   if (!raw || typeof raw !== "object") {
@@ -72,6 +81,7 @@ app.get("/diagnostics", async (_request, response, next) => {
 app.get("/guilds/:guildId/upload-limit", async (request, response, next) => {
   try {
     const guildId = String(request.params.guildId ?? "");
+    logger.info(`Upload limit requested for guild ${guildId}.`);
     response.json({ uploadLimitBytes: await getDiscordUploadLimitForGuild(guildId) });
   } catch (error) {
     next(error);
@@ -81,6 +91,7 @@ app.get("/guilds/:guildId/upload-limit", async (request, response, next) => {
 app.get("/guilds/:guildId/setup-status", async (request, response, next) => {
   try {
     const guildId = String(request.params.guildId ?? "");
+    logger.info(`Setup status requested for guild ${guildId}.`);
     response.json(await inspectDiscasaSetup(guildId));
   } catch (error) {
     next(error);
@@ -91,6 +102,7 @@ app.post("/guilds/:guildId/initialize", async (request, response, next) => {
   try {
     const guildId = String(request.params.guildId ?? "");
     const authenticatedUserId = typeof request.body.authenticatedUserId === "string" ? request.body.authenticatedUserId : undefined;
+    logger.info(`Initialize requested for guild ${guildId}.`, { authenticatedUserId: authenticatedUserId ?? null });
     response.json(await initializeDiscasaInGuild(guildId, authenticatedUserId));
   } catch (error) {
     next(error);
@@ -110,6 +122,11 @@ app.post("/files/upload", upload.array("files"), async (request, response, next)
       throw new HttpError(400, "FILES_REQUIRED", "At least one file is required.");
     }
 
+    logger.info(`Upload requested for guild ${context.guildId}.`, {
+      targetChannelId,
+      fileCount: files.length,
+      totalBytes: files.reduce((total, file) => total + file.size, 0),
+    });
     response.json({ records: await uploadFilesToDiscordChannel(files, context, targetChannelId) });
   } catch (error) {
     next(error);
@@ -127,7 +144,9 @@ app.post("/files/delete-messages", async (request, response, next) => {
       };
     }).filter((message: { channelId: string; messageId: string }) => message.channelId.length > 0 && message.messageId.length > 0);
 
-    await deleteStorageMessagesFromDiscord(readContext(request.body.context), messages);
+    const context = readContext(request.body.context);
+    logger.info(`Delete storage messages requested for guild ${context.guildId}.`, { messageCount: messages.length });
+    await deleteStorageMessagesFromDiscord(context, messages);
     response.json({ deleted: true });
   } catch (error) {
     next(error);
@@ -137,8 +156,10 @@ app.post("/files/delete-messages", async (request, response, next) => {
 app.post("/files/drive/attachments", async (request, response, next) => {
   try {
     const beforeMessageId = typeof request.body.beforeMessageId === "string" ? request.body.beforeMessageId : undefined;
+    const context = readContext(request.body.context);
+    logger.info(`Drive attachment scan requested for guild ${context.guildId}.`, { beforeMessageId: beforeMessageId ?? null });
     response.json(await listDiscordDriveAttachments(
-      readContext(request.body.context),
+      context,
       beforeMessageId,
     ));
   } catch (error) {
@@ -148,6 +169,8 @@ app.post("/files/drive/attachments", async (request, response, next) => {
 
 app.post("/files/resolve-attachment", async (request, response, next) => {
   try {
+    const reference = request.body.reference as { preferredFileName?: unknown } | undefined;
+    logger.info("Attachment resolution requested.", { preferredFileName: reference?.preferredFileName ?? null });
     response.json({
       resolution: await resolveAttachmentReference(request.body.reference),
     });
@@ -158,7 +181,9 @@ app.post("/files/resolve-attachment", async (request, response, next) => {
 
 app.post("/snapshots/index/current", async (request, response, next) => {
   try {
-    response.json({ current: await hasCurrentIndexSnapshot(readContext(request.body.context)) });
+    const context = readContext(request.body.context);
+    logger.info(`Current index snapshot check requested for guild ${context.guildId}.`);
+    response.json({ current: await hasCurrentIndexSnapshot(context) });
   } catch (error) {
     next(error);
   }
@@ -166,7 +191,9 @@ app.post("/snapshots/index/current", async (request, response, next) => {
 
 app.post("/snapshots/folder/current", async (request, response, next) => {
   try {
-    response.json({ current: await hasCurrentFolderSnapshot(readContext(request.body.context)) });
+    const context = readContext(request.body.context);
+    logger.info(`Current folder snapshot check requested for guild ${context.guildId}.`);
+    response.json({ current: await hasCurrentFolderSnapshot(context) });
   } catch (error) {
     next(error);
   }
@@ -174,7 +201,9 @@ app.post("/snapshots/folder/current", async (request, response, next) => {
 
 app.post("/snapshots/config/current", async (request, response, next) => {
   try {
-    response.json({ current: await hasCurrentConfigSnapshot(readContext(request.body.context)) });
+    const context = readContext(request.body.context);
+    logger.info(`Current config snapshot check requested for guild ${context.guildId}.`);
+    response.json({ current: await hasCurrentConfigSnapshot(context) });
   } catch (error) {
     next(error);
   }
@@ -182,7 +211,9 @@ app.post("/snapshots/config/current", async (request, response, next) => {
 
 app.post("/snapshots/index/latest", async (request, response, next) => {
   try {
-    response.json({ snapshot: await readLatestIndexSnapshot(readContext(request.body.context)) });
+    const context = readContext(request.body.context);
+    logger.info(`Latest index snapshot requested for guild ${context.guildId}.`);
+    response.json({ snapshot: await readLatestIndexSnapshot(context) });
   } catch (error) {
     next(error);
   }
@@ -190,7 +221,9 @@ app.post("/snapshots/index/latest", async (request, response, next) => {
 
 app.post("/snapshots/folder/latest", async (request, response, next) => {
   try {
-    response.json({ snapshot: await readLatestFolderSnapshot(readContext(request.body.context)) });
+    const context = readContext(request.body.context);
+    logger.info(`Latest folder snapshot requested for guild ${context.guildId}.`);
+    response.json({ snapshot: await readLatestFolderSnapshot(context) });
   } catch (error) {
     next(error);
   }
@@ -198,7 +231,9 @@ app.post("/snapshots/folder/latest", async (request, response, next) => {
 
 app.post("/snapshots/config/latest", async (request, response, next) => {
   try {
-    response.json({ snapshot: await readLatestConfigSnapshot(readContext(request.body.context)) });
+    const context = readContext(request.body.context);
+    logger.info(`Latest config snapshot requested for guild ${context.guildId}.`);
+    response.json({ snapshot: await readLatestConfigSnapshot(context) });
   } catch (error) {
     next(error);
   }
@@ -206,7 +241,9 @@ app.post("/snapshots/config/latest", async (request, response, next) => {
 
 app.post("/snapshots/index/sync", async (request, response, next) => {
   try {
-    await syncIndexSnapshot(readContext(request.body.context), request.body.snapshot as PersistedIndexSnapshot);
+    const context = readContext(request.body.context);
+    logger.info(`Index snapshot sync requested for guild ${context.guildId}.`);
+    await syncIndexSnapshot(context, request.body.snapshot as PersistedIndexSnapshot);
     response.json({ synced: true });
   } catch (error) {
     next(error);
@@ -215,7 +252,9 @@ app.post("/snapshots/index/sync", async (request, response, next) => {
 
 app.post("/snapshots/folder/sync", async (request, response, next) => {
   try {
-    await syncFolderSnapshot(readContext(request.body.context), request.body.snapshot as PersistedFolderSnapshot);
+    const context = readContext(request.body.context);
+    logger.info(`Folder snapshot sync requested for guild ${context.guildId}.`);
+    await syncFolderSnapshot(context, request.body.snapshot as PersistedFolderSnapshot);
     response.json({ synced: true });
   } catch (error) {
     next(error);
@@ -224,7 +263,9 @@ app.post("/snapshots/folder/sync", async (request, response, next) => {
 
 app.post("/snapshots/config/sync", async (request, response, next) => {
   try {
-    await syncConfigSnapshot(readContext(request.body.context), request.body.snapshot as PersistedConfigSnapshot);
+    const context = readContext(request.body.context);
+    logger.info(`Config snapshot sync requested for guild ${context.guildId}.`);
+    await syncConfigSnapshot(context, request.body.snapshot as PersistedConfigSnapshot);
     response.json({ synced: true });
   } catch (error) {
     next(error);

@@ -255,12 +255,14 @@ Route handlers should pass errors through Express error handling. Avoid returnin
 
 Logs should be operationally useful:
 
+- every HTTP request with method, route, status, and elapsed time;
 - startup mode and port;
 - Discord login state;
 - setup actions;
-- upload failures;
-- snapshot read/write failures;
-- deletion failures.
+- upload actions and failures;
+- drive attachment scans and attachment resolution requests;
+- snapshot current/latest/sync actions and failures;
+- deletion actions and failures.
 
 Do not log secret tokens or full OAuth credentials.
 
@@ -328,6 +330,7 @@ Before pushing bot changes:
 - `.\start-bot.bat` starts the service.
 - `http://localhost:3002/health` responds.
 - `http://localhost:3002/diagnostics` responds.
+- Console logs include HTTP method, route, status, and elapsed time for bot requests.
 - In mock mode, app diagnostics can reach the bot.
 - In Discord mode, bot logs in successfully.
 - Setup status can inspect a selected guild.

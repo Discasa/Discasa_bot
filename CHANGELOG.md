@@ -2,6 +2,17 @@
 
 All notable changes to **Discasa Bot** are documented in this file.
 
+## [2026-05-03-action-logging]
+
+### Added
+
+- Added HTTP request logging with method, route, status, and elapsed time.
+- Added console logs for setup inspection/initialization, uploads, storage deletion, drive attachment scans, attachment resolution, snapshot reads, and snapshot writes.
+
+### Changed
+
+- Documented the expanded operational logging behavior and manual verification checklist.
+
 ## [2026-05-02-developer-docs]
 
 ### Changed

@@ -440,15 +440,21 @@ async function getBotClient(): Promise<Client | null> {
   if (!botClient) {
     const client = new Client({ intents: [GatewayIntentBits.Guilds] });
     botClient = client;
+    logger.info("[Discord client] Logging in.");
     botClientReadyPromise = client
       .login(env.discordBotToken)
       .then(() => waitForBotClientReady(client))
+      .then((readyClient) => {
+        logger.info("[Discord client] Ready.", { botUserId: readyClient.user?.id ?? null });
+        return readyClient;
+      })
       .catch((error) => {
         if (botClient === client) {
           botClient = null;
           botClientReadyPromise = null;
         }
 
+        logger.error("[Discord client] Login failed.", error);
         throw error;
       });
   }
@@ -624,9 +630,12 @@ async function deleteDiscordMessage(channelId: string, messageId: string): Promi
   const channel = await getGuildTextChannel(channelId);
 
   try {
+    logger.info("[Discord storage] Deleting message.", { channelId, messageId });
     const message = await channel.messages.fetch(messageId);
     await enqueueDiscordWrite(() => message.delete());
-  } catch {
+    logger.info("[Discord storage] Deleted message.", { channelId, messageId });
+  } catch (error) {
+    logger.warn("[Discord storage] Message delete skipped or failed.", { channelId, messageId, error });
     // Ignore missing messages so the index can still recover.
   }
 }
@@ -639,6 +648,13 @@ async function sendBufferToChannel(
   guildId: string,
 ): Promise<UploadedFileRecord> {
   const channel = await getGuildTextChannel(channelId);
+  logger.info("[Discord storage] Uploading file.", {
+    guildId,
+    channelId,
+    fileName,
+    bytes: fileBuffer.byteLength,
+    mimeType,
+  });
   const sentMessage = await enqueueDiscordWrite(() =>
     channel.send({
       files: [
@@ -657,6 +673,14 @@ async function sendBufferToChannel(
   if (!attachment) {
     throw new Error(`Discord did not return an attachment URL for ${fileName}.`);
   }
+
+  logger.info("[Discord storage] Uploaded file.", {
+    guildId,
+    channelId,
+    messageId: sentMessage.id,
+    attachmentId: attachment.id,
+    fileName,
+  });
 
   return {
     fileName,
@@ -1131,6 +1155,14 @@ async function writeSnapshotToChannel(
     [...message.attachments.values()].some((attachment) => cleanupFileNames.includes(attachment.name ?? "")),
   );
 
+  logger.info("[Discasa snapshot] Writing snapshot.", {
+    channelId,
+    fileName,
+    label,
+    bytes: Buffer.byteLength(content, "utf8"),
+    staleMessageCount: staleMessages.length,
+  });
+
   await enqueueDiscordWrite(() =>
     channel.send({
       content: `${label} ${new Date().toISOString()}`,
@@ -1145,11 +1177,14 @@ async function writeSnapshotToChannel(
 
   for (const message of staleMessages) {
     try {
+      logger.info("[Discasa snapshot] Removing stale snapshot message.", { channelId, messageId: message.id });
       await enqueueDiscordWrite(() => message.delete());
     } catch {
       // Ignore stale cleanup failures so the latest snapshot still wins.
     }
   }
+
+  logger.info("[Discasa snapshot] Snapshot written.", { channelId, fileName, staleMessageCount: staleMessages.length });
 }
 
 async function migrateLegacyMetadataSnapshots(
@@ -1162,6 +1197,11 @@ async function migrateLegacyMetadataSnapshots(
   if (legacyFolderChannel && !(await hasCurrentFolderSnapshot(context))) {
     const legacyFolderSnapshot = await readJsonSnapshot(legacyFolderChannel.id, [FOLDER_SNAPSHOT_FILENAME]);
     if (legacyFolderSnapshot && isFolderSnapshot(legacyFolderSnapshot.payload)) {
+      logger.info("[Discasa snapshot] Migrating legacy folder snapshot.", {
+        guildId: context.guildId,
+        fromChannelId: legacyFolderChannel.id,
+        toChannelId: context.folderChannelId,
+      });
       await syncFolderSnapshot(context, legacyFolderSnapshot.payload);
     }
   }
@@ -1169,6 +1209,11 @@ async function migrateLegacyMetadataSnapshots(
   if (legacyConfigChannel && !(await hasCurrentConfigSnapshot(context))) {
     const legacyConfigSnapshot = await readJsonSnapshot(legacyConfigChannel.id, [CONFIG_SNAPSHOT_FILENAME]);
     if (legacyConfigSnapshot && isConfigSnapshot(legacyConfigSnapshot.payload)) {
+      logger.info("[Discasa snapshot] Migrating legacy config snapshot.", {
+        guildId: context.guildId,
+        fromChannelId: legacyConfigChannel.id,
+        toChannelId: context.configChannelId,
+      });
       await syncConfigSnapshot(context, legacyConfigSnapshot.payload);
     }
   }
@@ -1176,6 +1221,7 @@ async function migrateLegacyMetadataSnapshots(
 
 export async function inspectDiscasaSetup(guildId: string): Promise<DiscasaSetupStatus> {
   if (env.mockMode) {
+    logger.info("[Discasa setup] Inspecting setup in mock mode.", { guildId });
     return {
       botPresent: true,
       categoryPresent: true,
@@ -1188,6 +1234,7 @@ export async function inspectDiscasaSetup(guildId: string): Promise<DiscasaSetup
 
   const client = await getBotClient();
   if (!client) {
+    logger.warn("[Discasa setup] Cannot inspect setup because the bot client is unavailable.", { guildId });
     return {
       botPresent: false,
       categoryPresent: false,
@@ -1203,6 +1250,7 @@ export async function inspectDiscasaSetup(guildId: string): Promise<DiscasaSetup
   try {
     guild = await client.guilds.fetch(guildId);
   } catch {
+    logger.warn("[Discasa setup] Guild fetch failed while inspecting setup.", { guildId });
     return {
       botPresent: false,
       categoryPresent: false,
@@ -1223,6 +1271,13 @@ export async function inspectDiscasaSetup(guildId: string): Promise<DiscasaSetup
   const categoryPresent = Boolean(structure.category);
   const channelsPresent = structure.missingChannels.length === 0;
   const isApplied = categoryPresent && channelsPresent && configMarkerPresent;
+  logger.info("[Discasa setup] Setup inspection complete.", {
+    guildId,
+    categoryPresent,
+    channelsPresent,
+    configMarkerPresent,
+    missingChannels: structure.missingChannels,
+  });
 
   return {
     botPresent: true,
@@ -1236,6 +1291,7 @@ export async function inspectDiscasaSetup(guildId: string): Promise<DiscasaSetup
 
 export async function initializeDiscasaInGuild(guildId: string, authenticatedUserId?: string): Promise<ActiveStorageContext> {
   if (env.mockMode) {
+    logger.info("[Discasa setup] Initializing setup in mock mode.", { guildId, authenticatedUserId: authenticatedUserId ?? null });
     return {
       guildId,
       guildName: "Discasa Server",
@@ -1259,6 +1315,7 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
     throw new Error("Bot client is not configured.");
   }
 
+  logger.info("[Discasa setup] Initializing guild.", { guildId, authenticatedUserId: authenticatedUserId ?? null });
   const guild = await client.guilds.fetch(guildId);
   await guild.channels.fetch();
 
@@ -1285,6 +1342,7 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
       permissionOverwrites: discasaOverwrites,
       reason: "Initialize private Discasa category",
     }));
+  logger.info("[Discasa setup] Category resolved.", { guildId, categoryId: category.id, created: !initialStructure.category });
 
   await category.edit({
     permissionOverwrites: discasaOverwrites,
@@ -1299,6 +1357,7 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
     if (existing) {
       const existingChannel = await guild.channels.fetch(existing.id);
       if (existingChannel && existingChannel.type === ChannelType.GuildText) {
+        logger.info("[Discasa setup] Securing existing channel.", { guildId, channelName, channelId: existing.id });
         await existingChannel.edit({
           parent: category.id,
           permissionOverwrites: discasaOverwrites,
@@ -1316,6 +1375,7 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
       reason: "Initialize private Discasa channels",
     });
 
+    logger.info("[Discasa setup] Created channel.", { guildId, channelName, channelId: nextChannel.id });
     resolvedChannels.set(channelName, {
       id: nextChannel.id,
       name: nextChannel.name,
@@ -1325,6 +1385,14 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
   const context = buildActiveStorageContext(guild, { id: category.id, name: category.name }, resolvedChannels);
   await migrateLegacyMetadataSnapshots(context, initialStructure.legacyChannels);
   await syncInstallMarker(context);
+  logger.info("[Discasa setup] Guild initialization complete.", {
+    guildId,
+    categoryId: context.categoryId,
+    driveChannelId: context.driveChannelId,
+    indexChannelId: context.indexChannelId,
+    trashChannelId: context.trashChannelId,
+    configChannelId: context.configChannelId,
+  });
   return context;
 }
 export async function listDiscordDriveAttachments(
@@ -1332,6 +1400,7 @@ export async function listDiscordDriveAttachments(
   beforeMessageId?: string,
 ): Promise<DiscordDriveAttachmentPage> {
   if (env.mockMode) {
+    logger.info("[Discord storage] Listing drive attachments in mock mode.", { guildId: context.guildId });
     return {
       records: [],
       scannedAttachmentCount: 0,
@@ -1342,6 +1411,11 @@ export async function listDiscordDriveAttachments(
   const records: DiscordDriveAttachmentRecord[] = [];
   let scannedAttachmentCount = 0;
 
+  logger.info("[Discord storage] Listing drive attachments.", {
+    guildId: context.guildId,
+    channelId: context.driveChannelId,
+    beforeMessageId: beforeMessageId ?? null,
+  });
   const messages = await channel.messages.fetch(beforeMessageId ? { limit: 100, before: beforeMessageId } : { limit: 100 });
 
   for (const message of messages.values()) {
@@ -1357,6 +1431,13 @@ export async function listDiscordDriveAttachments(
   }
 
   const oldestMessage = [...messages.values()].at(-1);
+  logger.info("[Discord storage] Drive attachment page loaded.", {
+    guildId: context.guildId,
+    messageCount: messages.size,
+    scannedAttachmentCount,
+    returnedRecordCount: records.length,
+    nextBeforeMessageId: oldestMessage && messages.size >= 100 ? oldestMessage.id : null,
+  });
 
   return {
     records,
@@ -1377,6 +1458,11 @@ export async function uploadFilesToDiscordChannel(
   targetChannelId: string,
 ): Promise<UploadedFileRecord[]> {
   if (env.mockMode) {
+    logger.info("[Discord storage] Uploading files in mock mode.", {
+      guildId: context.guildId,
+      targetChannelId,
+      fileCount: files.length,
+    });
     return files.map((file) => ({
       fileName: file.originalname,
       fileSize: file.size,
@@ -1396,6 +1482,12 @@ export async function uploadFilesToDiscordChannel(
   }
 
   const uploaded: UploadedFileRecord[] = [];
+  logger.info("[Discord storage] Upload batch started.", {
+    guildId: context.guildId,
+    targetChannelId,
+    fileCount: files.length,
+    totalBytes: files.reduce((total, file) => total + file.size, 0),
+  });
 
   for (const file of files) {
     const nextRecord = await sendBufferToChannel(
@@ -1412,6 +1504,11 @@ export async function uploadFilesToDiscordChannel(
     });
   }
 
+  logger.info("[Discord storage] Upload batch complete.", {
+    guildId: context.guildId,
+    targetChannelId,
+    uploadedCount: uploaded.length,
+  });
   return uploaded;
 }
 
@@ -1419,6 +1516,10 @@ export async function deleteStorageMessagesFromDiscord(
   context: ActiveStorageContext,
   messages: Array<{ channelId: string; messageId: string }>,
 ): Promise<void> {
+  logger.info("[Discord storage] Delete message batch started.", {
+    guildId: context.guildId,
+    messageCount: messages.length,
+  });
   for (const message of messages) {
     assertWritableFileStorageChannel(context, message.channelId);
   }
@@ -1426,6 +1527,10 @@ export async function deleteStorageMessagesFromDiscord(
   for (const message of messages) {
     await deleteDiscordMessage(message.channelId, message.messageId);
   }
+  logger.info("[Discord storage] Delete message batch complete.", {
+    guildId: context.guildId,
+    messageCount: messages.length,
+  });
 }
 
 export async function hasCurrentIndexSnapshot(context: ActiveStorageContext): Promise<boolean> {
@@ -1485,14 +1590,17 @@ export async function readLatestIndexSnapshot(
 
   const found = await readJsonSnapshot(context.indexChannelId, [INDEX_SNAPSHOT_FILENAME, LEGACY_INDEX_SNAPSHOT_FILENAME]);
   if (!found) {
+    logger.info("[Discasa snapshot] No index snapshot found.", { guildId: context.guildId, channelId: context.indexChannelId });
     return null;
   }
 
   if (isIndexSnapshot(found.payload)) {
+    logger.info("[Discasa snapshot] Latest index snapshot loaded.", { guildId: context.guildId, fileName: found.fileName });
     return found.payload;
   }
 
   if (isLegacyIndexSnapshot(found.payload)) {
+    logger.info("[Discasa snapshot] Legacy index snapshot loaded and converted.", { guildId: context.guildId, fileName: found.fileName });
     return convertLegacyIndexToCurrent(found.payload);
   }
 
@@ -1511,6 +1619,7 @@ export async function readLatestFolderSnapshot(
 
   const current = await readJsonSnapshot(context.folderChannelId, [FOLDER_SNAPSHOT_FILENAME]);
   if (current && isFolderSnapshot(current.payload)) {
+    logger.info("[Discasa snapshot] Latest folder snapshot loaded.", { guildId: context.guildId, fileName: current.fileName });
     return current.payload;
   }
 
@@ -1522,6 +1631,7 @@ export async function readLatestFolderSnapshot(
 
   const legacy = await readJsonSnapshot(context.indexChannelId, [LEGACY_INDEX_SNAPSHOT_FILENAME]);
   if (legacy && isLegacyIndexSnapshot(legacy.payload)) {
+    logger.info("[Discasa snapshot] Folder snapshot derived from legacy index.", { guildId: context.guildId, fileName: legacy.fileName });
     return deriveFolderSnapshotFromLegacyIndex(legacy.payload);
   }
 
@@ -1531,6 +1641,7 @@ export async function readLatestFolderSnapshot(
     );
   }
 
+  logger.info("[Discasa snapshot] No folder snapshot found.", { guildId: context.guildId, channelId: context.folderChannelId });
   return null;
 }
 
@@ -1543,6 +1654,7 @@ export async function readLatestConfigSnapshot(
 
   const current = await readJsonSnapshot(context.configChannelId, [CONFIG_SNAPSHOT_FILENAME]);
   if (current && isConfigSnapshot(current.payload)) {
+    logger.info("[Discasa snapshot] Latest config snapshot loaded.", { guildId: context.guildId, fileName: current.fileName });
     return current.payload;
   }
 
@@ -1552,6 +1664,7 @@ export async function readLatestConfigSnapshot(
     );
   }
 
+  logger.info("[Discasa snapshot] No config snapshot found.", { guildId: context.guildId, channelId: context.configChannelId });
   return null;
 }
 
