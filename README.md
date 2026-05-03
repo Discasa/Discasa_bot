@@ -13,8 +13,8 @@ The bot includes:
 - a compact Node.js, Express, and `discord.js` service;
 - health and diagnostics endpoints for hosted monitoring;
 - setup inspection and initialization for Discasa servers;
-- creation or reuse of the Discasa category and channels;
-- targeted file uploads to Discord channels;
+- creation or reuse of the Discasa category, media channel, and index channel;
+- targeted file uploads to the Discasa media channel;
 - message deletion for storage cleanup;
 - raw attachment listing from `discasa-drive`;
 - targeted attachment reference resolution;
@@ -52,12 +52,12 @@ When Discasa is applied to a Discord server, the bot creates or reuses:
 Discasa
   #discasa-drive
   #discasa-index
-  #discasa-trash
 ```
 
-- `discasa-drive`: active file storage.
+- `discasa-drive`: all file storage, including attachments for files currently marked as trashed in the app.
 - `discasa-index`: index, folder, config, and install snapshots.
-- `discasa-trash`: retained for compatibility with older app versions and existing trash-channel storage. Current trash/restore decisions are logical app state in snapshots.
+
+New setup does not create, require, or display a Discord trash channel. The bot still allows cleanup of storage messages already referenced in a legacy `discasa-trash` channel from older installations, but uploads never target that channel.
 
 The bot also keeps compatibility with older Discasa installations where snapshot data may exist in legacy channels.
 

@@ -126,7 +126,6 @@ The bot creates or reuses this private structure inside the selected server:
 Discasa
   #discasa-drive
   #discasa-index
-  #discasa-trash
 ```
 
 Responsibilities:
@@ -139,9 +138,10 @@ Responsibilities:
 
 Channel purpose:
 
-- `discasa-drive`: active file attachments and chunk parts.
+- `discasa-drive`: all file attachments and chunk parts, including files currently marked as trashed in the app.
 - `discasa-index`: index, folder, config, and installation snapshots.
-- `discasa-trash`: compatibility channel for older app versions and any storage already there. Current trash/restore is app-owned logical snapshot state, not a bot-owned physical move.
+
+New setup does not create, require, or display a Discord trash channel. A legacy `discasa-trash` channel may still exist in older servers; the bot only treats it as a cleanup target for messages already referenced by older app snapshots.
 
 ## 7. HTTP API
 

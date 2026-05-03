@@ -2,6 +2,18 @@
 
 All notable changes to **Discasa Bot** are documented in this file.
 
+## [2026-05-03-two-channel-discord-storage]
+
+### Changed
+
+- Removed `discasa-trash` from the active setup contract; the bot now creates/reuses only `discasa-drive` and `discasa-index`.
+- Restricted uploads to the media channel while keeping app-owned trash/restore as snapshot state.
+- Updated README and developer documentation for the two-channel Discord structure.
+
+### Fixed
+
+- Kept permanent delete compatible with legacy storage messages already located in old `discasa-trash` channels without requiring that channel for new setup.
+
 ## [2026-05-03-quieter-adapter-logs]
 
 ### Changed

@@ -16,7 +16,7 @@ import { logger } from "./logger";
 // Shared contracts
 
 export const DISCASA_CATEGORY_NAME = "Discasa";
-export const DISCASA_CHANNELS = ["discasa-drive", "discasa-index", "discasa-trash"] as const;
+export const DISCASA_CHANNELS = ["discasa-drive", "discasa-index"] as const;
 
 export type GuildSummary = {
   id: string;
@@ -268,8 +268,6 @@ export type ActiveStorageContext = {
   indexChannelName: string;
   folderChannelId: string;
   folderChannelName: string;
-  trashChannelId: string;
-  trashChannelName: string;
   configChannelId: string;
   configChannelName: string;
 };
@@ -361,6 +359,7 @@ const CONFIG_SNAPSHOT_FILENAME = "discasa-config.snapshot.json";
 const INSTALL_MARKER_FILENAME = "discasa-install.marker.json";
 const LEGACY_FOLDER_CHANNEL_NAME = "discasa-folder";
 const LEGACY_CONFIG_CHANNEL_NAME = "discasa-config";
+const LEGACY_TRASH_CHANNEL_NAME = "discasa-trash";
 const DISCASA_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024;
 let botClient: Client | null = null;
 let botClientReadyPromise: Promise<Client> | null = null;
@@ -1098,9 +1097,8 @@ function buildActiveStorageContext(
 ): ActiveStorageContext {
   const driveChannel = channels.get(DISCASA_CHANNELS[0]);
   const indexChannel = channels.get(DISCASA_CHANNELS[1]);
-  const trashChannel = channels.get(DISCASA_CHANNELS[2]);
 
-  if (!driveChannel || !indexChannel || !trashChannel) {
+  if (!driveChannel || !indexChannel) {
     throw new Error("Discasa storage channels could not be resolved.");
   }
 
@@ -1115,8 +1113,6 @@ function buildActiveStorageContext(
     indexChannelName: indexChannel.name,
     folderChannelId: indexChannel.id,
     folderChannelName: indexChannel.name,
-    trashChannelId: trashChannel.id,
-    trashChannelName: trashChannel.name,
     configChannelId: indexChannel.id,
     configChannelName: indexChannel.name,
   };
@@ -1303,8 +1299,6 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
       indexChannelName: DISCASA_CHANNELS[1],
       folderChannelId: "mock-index",
       folderChannelName: DISCASA_CHANNELS[1],
-      trashChannelId: "mock-trash",
-      trashChannelName: DISCASA_CHANNELS[2],
       configChannelId: "mock-index",
       configChannelName: DISCASA_CHANNELS[1],
     };
@@ -1390,7 +1384,6 @@ export async function initializeDiscasaInGuild(guildId: string, authenticatedUse
     categoryId: context.categoryId,
     driveChannelId: context.driveChannelId,
     indexChannelId: context.indexChannelId,
-    trashChannelId: context.trashChannelId,
     configChannelId: context.configChannelId,
   });
   return context;
@@ -1447,9 +1440,27 @@ export async function listDiscordDriveAttachments(
 }
 
 function assertWritableFileStorageChannel(context: ActiveStorageContext, channelId: string): void {
-  if (channelId !== context.driveChannelId && channelId !== context.trashChannelId) {
+  if (channelId !== context.driveChannelId) {
     throw new Error("Target storage channel is not writable for file content.");
   }
+}
+
+async function assertDeletableFileStorageChannel(context: ActiveStorageContext, channelId: string): Promise<void> {
+  if (channelId === context.driveChannelId) {
+    return;
+  }
+
+  const channel = await getGuildTextChannel(channelId);
+  const guildChannel = channel as GuildTextBasedChannel & { guild?: { id: string }; parentId?: string | null; name?: string };
+  if (
+    guildChannel.guild?.id === context.guildId &&
+    guildChannel.parentId === context.categoryId &&
+    guildChannel.name === LEGACY_TRASH_CHANNEL_NAME
+  ) {
+    return;
+  }
+
+  throw new Error("Target storage channel is not deletable for file content.");
 }
 
 export async function uploadFilesToDiscordChannel(
@@ -1521,7 +1532,7 @@ export async function deleteStorageMessagesFromDiscord(
     messageCount: messages.length,
   });
   for (const message of messages) {
-    assertWritableFileStorageChannel(context, message.channelId);
+    await assertDeletableFileStorageChannel(context, message.channelId);
   }
 
   for (const message of messages) {
